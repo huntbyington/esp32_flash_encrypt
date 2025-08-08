@@ -9,90 +9,19 @@ import sys
 import subprocess
 import argparse
 import platform
-import glob
-import shutil
 from pathlib import Path
-
-# Global cache for tool paths
-TOOL_CACHE = {}
-
-
-def find_esp_tool(tool_name):
-    """Find ESP tool in common locations"""
-    if tool_name in TOOL_CACHE:
-        return TOOL_CACHE[tool_name]
-
-    # First try system PATH
-    path = shutil.which(tool_name)
-    if path:
-        TOOL_CACHE[tool_name] = path
-        return path
-
-    # Check common installation locations
-    search_paths = []
-
-    # PlatformIO installation
-    platformio_dir = Path.home() / ".platformio"
-    search_paths.extend(
-        [
-            platformio_dir / "packages" / "framework-espidf" / "tools" / tool_name,
-            platformio_dir / "packages" / "tool-esptoolpy" / "**" / tool_name,
-        ]
-    )
-
-    # Espressif official installation
-    if platform.system() == "Windows":
-        espressif_dir = Path("C:/Espressif")
-        if espressif_dir.exists():
-            search_paths.extend(
-                [
-                    espressif_dir / "frameworks" / "esp-idf-*" / "tools" / tool_name,
-                    espressif_dir / "tools" / tool_name,
-                ]
-            )
-
-    # Recursive search in common locations
-    for path_pattern in search_paths:
-        matches = glob.glob(str(path_pattern), recursive=True)
-        if matches:
-            # Prefer the first match
-            TOOL_CACHE[tool_name] = matches[0]
-            return matches[0]
-
-    # Last resort: try in the current Python environment
-    try:
-        from importlib.util import find_spec
-
-        module_path = find_spec("esptool").origin
-        if module_path:
-            tool_path = Path(module_path).parent.parent / "esptool" / tool_name
-            if tool_path.exists():
-                TOOL_CACHE[tool_name] = str(tool_path)
-                return str(tool_path)
-    except ImportError:
-        pass
-
-    return None  # Tool not found
 
 
 def fix_command_for_windows(cmd):
-    """Fix command for Windows using sys.executable"""
-    if platform.system() == "Windows" and cmd:
+    """Fix command for Windows by adding python prefix to .py files"""
+    if platform.system() == "Windows" and len(cmd) > 0:
         if cmd[0].endswith(".py"):
-            return [sys.executable] + cmd
+            return ["python"] + cmd
     return cmd
 
 
 def run_command(cmd, description=""):
     """Run a command and handle errors"""
-    # Resolve tool paths for known ESP tools
-    if cmd and cmd[0] in ["espsecure.py", "espefuse.py", "esptool.py"]:
-        tool_path = find_esp_tool(cmd[0])
-        if tool_path:
-            cmd[0] = tool_path
-        else:
-            print(f"Warning: Could not find {cmd[0]}")
-
     # Fix command for Windows
     cmd = fix_command_for_windows(cmd)
 
