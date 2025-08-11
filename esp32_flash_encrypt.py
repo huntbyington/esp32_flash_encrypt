@@ -12,21 +12,38 @@ import platform
 from pathlib import Path
 
 
-def fix_command_for_windows(cmd):
-    """Fix command for Windows by adding python prefix to .py files"""
-    if platform.system() == "Windows" and len(cmd) > 0:
-        if cmd[0].endswith(".py"):
-            return ["python"] + cmd
+def fix_esp_command(cmd):
+    """Convert ESP tool commands to use python -m approach"""
+    if not cmd:
+        return cmd
+
+    # Convert ESP tools to module calls
+    esp_tools = {
+        "espsecure.py": "espsecure",
+        "espefuse.py": "espefuse",
+        "esptool.py": "esptool",
+    }
+
+    if cmd[0] in esp_tools:
+        module_name = esp_tools[cmd[0]]
+        return [sys.executable, "-m", module_name] + cmd[1:]
+
+    # Handle other Python scripts on Windows
+    if platform.system() == "Windows" and cmd[0].endswith(".py"):
+        return [sys.executable] + cmd
+
     return cmd
 
 
 def run_command(cmd, description=""):
     """Run a command and handle errors"""
-    # Fix command for Windows
-    cmd = fix_command_for_windows(cmd)
+    # Convert ESP tools to module approach
+    original_cmd = cmd.copy()
+    cmd = fix_esp_command(cmd)
 
     print(f"\n{'=' * 60}")
     print(f"Running: {description}")
+    print(f"Original: {' '.join(original_cmd)}")
     print(f"Command: {' '.join(cmd)}")
     print(f"{'=' * 60}")
 
@@ -41,8 +58,9 @@ def run_command(cmd, description=""):
         print(f"stdout: {e.stdout}")
         print(f"stderr: {e.stderr}")
         return False
-    except FileNotFoundError:
-        print(f"Error: Command not found. Make sure ESP-IDF tools are in PATH")
+    except FileNotFoundError as e:
+        print(f"Error: Command not found: {e}")
+        print("Make sure ESP-IDF tools are installed and accessible")
         return False
 
 
@@ -151,6 +169,7 @@ def main():
                 "espefuse.py",
                 "--port",
                 args.port,
+                "--do-not-confirm",
                 "burn_key",
                 "flash_encryption",
                 str(key_file),
@@ -170,6 +189,7 @@ def main():
                 "espefuse.py",
                 "--port",
                 args.port,
+                "--do-not-confirm",
                 "--chip",
                 args.chip,
                 "burn_efuse",
@@ -185,6 +205,7 @@ def main():
                 "espefuse.py",
                 "--port",
                 args.port,
+                "--do-not-confirm",
                 "--chip",
                 args.chip,
                 "burn_efuse",
@@ -195,36 +216,15 @@ def main():
         ):
             print("Failed to burn FLASH_CRYPT_CONFIG. Continuing anyway...")
 
-        # Step 4: Burn Additional Security eFuses (Production only)
         if not args.development:
-            print("\nStep 4: Burning Additional Security eFuses (Production)")
-            security_efuses = [
-                ("DISABLE_DL_ENCRYPT", "0x1"),
-                ("DISABLE_DL_DECRYPT", "0x1"),
-                ("DISABLE_DL_CACHE", "0x1"),
-                ("JTAG_DISABLE", "0x1"),
-            ]
-
-            for efuse_name, efuse_value in security_efuses:
-                run_command(
-                    [
-                        "espefuse.py",
-                        "--port",
-                        args.port,
-                        "burn_efuse",
-                        efuse_name,
-                        efuse_value,
-                    ],
-                    f"Burn {efuse_name}",
-                )
-
-            # Step 5: Write Protect Security eFuses
+            # Step 4: Write Protect Security eFuses
             print("\nStep 5: Write Protecting Security eFuses")
             run_command(
                 [
                     "espefuse.py",
                     "--port",
                     args.port,
+                    "--do-not-confirm",
                     "write_protect_efuse",
                     "DIS_CACHE",
                 ],
@@ -232,7 +232,7 @@ def main():
             )
 
     if not args.flash_only:
-        # Step 6-8: Encrypt all binaries
+        # Step 5-7: Encrypt all binaries
         encryption_tasks = [
             (bootloader_bin, encrypted_bootloader, "0x1000", "Encrypt bootloader"),
             (partitions_bin, encrypted_partitions, "0x8000", "Encrypt partition table"),
@@ -298,7 +298,7 @@ def main():
 
     if args.development:
         print("\nNOTE: Development mode is enabled. This allows re-flashing.")
-        print("For production, use --development flag to disable development mode.")
+        print("For production, remove --development flag.")
     else:
         print("\nNOTE: Production mode enabled. Re-flashing will require")
         print("special procedures or may be permanently disabled.")
