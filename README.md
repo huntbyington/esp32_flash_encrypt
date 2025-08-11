@@ -39,6 +39,7 @@ Automates the process of setting up flash encryption on ESP32 devices using Plat
 # Download the script
 curl -O https://raw.githubusercontent.com/yourusername/esp32-encryption/main/esp32_encrypt.py
 chmod +x esp32_encrypt.py
+```
 
 **Acknowledgement**  
 *This README documentation was generated with the assistance of a Large Language Model (LLM).
