@@ -316,6 +316,26 @@ def main():
                 os.remove(f)
                 print(f"Deleted {f}")
 
+    if key_file.exists():
+        key_cleanup = (
+            input(f"\nDelete flash encryption key ({key_file})? (y/N): ")
+            .strip()
+            .lower()
+        )
+        if key_cleanup == "y":
+            print("\n⚠️  WARNING: Deleting the encryption key!")
+            print("   - You will NOT be able to decrypt or re-encrypt firmware")
+            print("   - This is IRREVERSIBLE if you don't have backups")
+            print("   - Only do this if the key is burned to eFuses")
+            confirm = input("\nType 'DELETE' to confirm: ").strip()
+            if confirm == "DELETE":
+                os.remove(key_file)
+                print(f"Deleted {key_file}")
+            else:
+                print("Key deletion cancelled.")
+        else:
+            print(f"Keeping encryption key: {key_file}")
+
 
 if __name__ == "__main__":
     main()
